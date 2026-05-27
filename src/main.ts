@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { ConfigService } from '@nestjs/config';
 
@@ -14,14 +15,17 @@ async function bootstrap() {
     .setVersion('1.0')
     .build();
   
+  // Set global prefix so Swagger picks it up
+  app.setGlobalPrefix('api/v1');
+
   const document = SwaggerModule.createDocument(app, config);
 
-  // Enable global validation pipe
-  // app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+  // Enable cookie parser
+  app.use(cookieParser());
 
-  // Set global prefix
-  app.setGlobalPrefix('api/v1');
-  
+  // Enable global validation pipe
+  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+
   // Set up standard Swagger UI (optional, but good for testing)
   // SwaggerModule.setup('api/swagger', app, document);
 
@@ -37,7 +41,7 @@ async function bootstrap() {
   );
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') ?? 3000;
+  const port = configService.get<number>('port') ?? 3000;
   await app.listen(port);
 
   logger.log(`Application is running on: http://localhost:${port}`);

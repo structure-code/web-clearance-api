@@ -6,10 +6,81 @@ datasource db {
   provider = "postgresql"
 }
 
-// Placeholder model - replace with your actual models
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
+enum Role {
+  STUDENT
+  DEPARTMENT_OFFICER
+  ADMIN
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  users     User[]
+  clearanceRequests ClearanceRequest[]
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id               String      @id @default(uuid())
+  email            String      @unique
+  password         String
+  name             String?
+  role             Role        @default(STUDENT)
+  
+  isEmailVerified  Boolean     @default(false)
+  emailVerifyToken String?     @unique
+  isActive         Boolean     @default(true)
+  
+  departmentId     String?
+  department       Department? @relation(fields: [departmentId], references: [id])
+  
+  resetToken       String?     @unique
+  resetTokenExpiry DateTime?
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  clearanceRequests ClearanceRequest[] @relation("StudentClearance")
+}
+
+enum ClearanceStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model ClearanceRequest {
+  id           String          @id @default(uuid())
+  studentId    String
+  student      User            @relation("StudentClearance", fields: [studentId], references: [id])
+  
+  departmentId String
+  department   Department      @relation(fields: [departmentId], references: [id])
+  
+  status       ClearanceStatus @default(PENDING)
+  remarks      String?         @db.Text
+  
+  documents    Document[]
+  
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([studentId, departmentId])
+}
+
+model Document {
+  id                 String           @id @default(uuid())
+  clearanceRequestId String
+  clearanceRequest   ClearanceRequest @relation(fields: [clearanceRequestId], references: [id], onDelete: Cascade)
+  
+  fileName           String
+  fileUrl            String
+  fileType           String
+  fileSize           Int
+  
+  uploadedAt         DateTime         @default(now())
 }
