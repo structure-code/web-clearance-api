@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Ip, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import { ClearanceRequestsService } from './clearance-requests.service';
 import { CreateClearanceRequestDto } from './dto/create-clearance-request.dto';
@@ -39,15 +39,27 @@ export class ClearanceRequestsController {
   @Patch(':id/approve')
   @Roles(Role.DEPARTMENT_OFFICER, Role.ADMIN)
   @ApiOperation({ summary: 'Approve a clearance request (Officer/Admin)' })
-  approve(@Param('id') id: string, @CurrentUser() user: User, @Body() updateDto: UpdateClearanceStatusDto) {
-    return this.clearanceRequestsService.updateStatus(id, user, ClearanceStatus.APPROVED, updateDto);
+  approve(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() updateDto: UpdateClearanceStatusDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.clearanceRequestsService.updateStatus(id, user, ClearanceStatus.APPROVED, updateDto, ip, userAgent);
   }
 
   @Patch(':id/reject')
   @Roles(Role.DEPARTMENT_OFFICER, Role.ADMIN)
   @ApiOperation({ summary: 'Reject a clearance request (Officer/Admin)' })
-  reject(@Param('id') id: string, @CurrentUser() user: User, @Body() updateDto: UpdateClearanceStatusDto) {
-    return this.clearanceRequestsService.updateStatus(id, user, ClearanceStatus.REJECTED, updateDto);
+  reject(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() updateDto: UpdateClearanceStatusDto,
+    @Ip() ip?: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.clearanceRequestsService.updateStatus(id, user, ClearanceStatus.REJECTED, updateDto, ip, userAgent);
   }
 
   @Patch(':id/complete')

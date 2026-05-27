@@ -23,6 +23,14 @@ async function bootstrap() {
   // Enable cookie parser
   app.use(cookieParser());
 
+  const configService = app.get(ConfigService);
+  const frontendUrl = configService.get<string>('frontendUrl');
+
+  app.enableCors({
+    origin: frontendUrl,
+    credentials: true,
+  });
+
   // Enable global validation pipe
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
 
@@ -40,7 +48,6 @@ async function bootstrap() {
     }),
   );
 
-  const configService = app.get(ConfigService);
   const port = configService.get<number>('port') ?? 3000;
   await app.listen(port);
 

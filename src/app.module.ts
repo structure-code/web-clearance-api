@@ -9,6 +9,9 @@ import { AuthModule } from './auth/auth.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { FilesModule } from './files/files.module';
 import { ClearanceRequestsModule } from './clearance-requests/clearance-requests.module';
+import { ActivityLogsModule } from './activity-logs/activity-logs.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { CertificatesModule } from './certificates/certificates.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -24,6 +27,9 @@ import configuration from './config/configuration';
     DepartmentsModule,
     FilesModule,
     ClearanceRequestsModule,
+    ActivityLogsModule,
+    NotificationsModule,
+    CertificatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

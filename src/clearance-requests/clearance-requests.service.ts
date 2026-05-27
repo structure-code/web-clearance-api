@@ -4,9 +4,19 @@ import { CreateClearanceRequestDto } from './dto/create-clearance-request.dto';
 import { UpdateClearanceStatusDto } from './dto/update-clearance-status.dto';
 import { User, ClearanceStatus, Role } from '@prisma/client';
 
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CertificatesService } from '../certificates/certificates.service';
+import { NotificationType } from '@prisma/client';
+
 @Injectable()
 export class ClearanceRequestsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private activityLogsService: ActivityLogsService,
+    private notificationsService: NotificationsService,
+    private certificatesService: CertificatesService,
+  ) {}
 
   async create(user: User, createDto: CreateClearanceRequestDto) {
     // Check if the department is active
@@ -113,9 +123,17 @@ export class ClearanceRequestsService {
     return request;
   }
 
-  async updateStatus(id: string, user: User, status: ClearanceStatus, updateDto: UpdateClearanceStatusDto) {
+  async updateStatus(
+    id: string,
+    user: User,
+    status: ClearanceStatus,
+    updateDto: UpdateClearanceStatusDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const request = await this.prisma.clearanceRequest.findUnique({
       where: { id },
+      include: { department: true },
     });
 
     if (!request) {
@@ -134,8 +152,31 @@ export class ClearanceRequestsService {
       },
     });
 
+    // Log the activity
+    await this.activityLogsService.logAction(
+      user.id,
+      `${status}_CLEARANCE`,
+      id,
+      'ClearanceRequest',
+      ipAddress,
+      userAgent,
+    );
+
     if (status === ClearanceStatus.APPROVED) {
+      await this.notificationsService.createNotification(
+        request.studentId,
+        'Clearance Request Approved',
+        `Your clearance request for ${request.department.name} has been approved.`,
+        NotificationType.SUCCESS,
+      );
       await this.checkAndCompleteStudentClearance(request.studentId);
+    } else if (status === ClearanceStatus.REJECTED) {
+      await this.notificationsService.createNotification(
+        request.studentId,
+        'Clearance Request Rejected',
+        `Your clearance request for ${request.department.name} has been rejected. Remarks: ${updateDto.remarks || 'None'}`,
+        NotificationType.ERROR,
+      );
     }
 
     return updated;
@@ -161,6 +202,17 @@ export class ClearanceRequestsService {
         where: { studentId },
         data: { status: ClearanceStatus.COMPLETED },
       });
+
+      // Generate the Certificate
+      await this.certificatesService.generateCertificate(studentId);
+
+      // Send final completion notification
+      await this.notificationsService.createNotification(
+        studentId,
+        'Final Clearance Completed',
+        'Congratulations! You have successfully completed all your departmental clearances. You can now download your Certificate of Clearance.',
+        NotificationType.SUCCESS,
+      );
     }
   }
 

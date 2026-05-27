@@ -52,4 +52,32 @@ export class FilesService {
       throw new InternalServerErrorException('Failed to upload file to S3');
     }
   }
+  async uploadBuffer(buffer: Buffer, originalName: string, mimeType: string): Promise<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }> {
+    const fileExtension = path.extname(originalName);
+    const uniqueFileName = `${uuidv4()}${fileExtension}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: uniqueFileName,
+      Body: buffer,
+      ContentType: mimeType,
+    });
+
+    try {
+      await this.s3Client.send(command);
+      
+      const region = this.configService.get('aws.region');
+      const fileUrl = `https://${this.bucketName}.s3.${region}.amazonaws.com/${uniqueFileName}`;
+
+      return {
+        fileUrl,
+        fileName: originalName,
+        fileType: mimeType,
+        fileSize: buffer.length,
+      };
+    } catch (error) {
+      this.logger.error('Error uploading buffer to S3', error);
+      throw new InternalServerErrorException('Failed to upload buffer to S3');
+    }
+  }
 }

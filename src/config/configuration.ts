@@ -1,5 +1,7 @@
 export default () => ({
   port: parseInt(process.env.PORT || '3000', 10),
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  emailFrom: process.env.EMAIL_FROM || 'Web Clearance <noreply@workfromanywhere.name.ng>',
   database: {
     url: process.env.DATABASE_URL,
   },
