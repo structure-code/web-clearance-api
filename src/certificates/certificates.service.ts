@@ -85,48 +85,174 @@ export class CertificatesService {
 
   private createPdfBuffer(student: any, approvedRequests: any[], qrBuffer: Buffer, token: string): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({
-        size: 'A4',
-        margin: 50,
-      });
+      const doc = new PDFDocument({ size: 'A4', margin: 0, layout: 'landscape' });
 
       const buffers: Buffer[] = [];
       doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        resolve(Buffer.concat(buffers));
-      });
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
-      // Draw PDF Content
-      doc.fontSize(25).text('CERTIFICATE OF CLEARANCE', { align: 'center' });
-      doc.moveDown();
+      const W = doc.page.width;
+      const H = doc.page.height;
+      const margin = 36;
 
-      doc.fontSize(14).text('This is to certify that', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(20).text(`${student.name || student.email}`, { align: 'center', underline: true });
-      doc.moveDown();
+      const GREEN = '#1A6B3C';
+      const LIGHT_GREEN = '#E8F5EE';
+      const WHITE = '#FFFFFF';
+      const DARK = '#111111';
+      const GREY = '#555555';
 
-      doc.fontSize(14).text(`Student ID: ${student.id}`, { align: 'center' });
-      doc.moveDown(2);
+      // Green corner triangles
+      const cs = 90;
+      doc.save().polygon([0, 0], [cs, 0], [0, cs]).fill(GREEN).restore();
+      doc.save().polygon([W, 0], [W - cs, 0], [W, cs]).fill(GREEN).restore();
+      doc.save().polygon([0, H], [cs, H], [0, H - cs]).fill(GREEN).restore();
+      doc.save().polygon([W, H], [W - cs, H], [W, H - cs]).fill(GREEN).restore();
 
-      doc.text('Has successfully completed all required departmental clearances as listed below:', { align: 'left' });
-      doc.moveDown();
+      // Outer border
+      doc.rect(margin, margin, W - margin * 2, H - margin * 2)
+        .lineWidth(2).strokeColor(GREEN).stroke();
 
-      // List Departments
-      doc.fontSize(12);
-      approvedRequests.forEach((req, index) => {
-        doc.text(`${index + 1}. ${req.department.name} - Cleared`);
+      // Header band
+      const headerH = 88;
+      doc.rect(margin, margin, W - margin * 2, headerH).fill(WHITE);
+      doc.fillColor(DARK).fontSize(16).font('Helvetica-Bold')
+        .text('WEB-CLEARANCE SYSTEM', margin, margin + 14, { align: 'center', width: W - margin * 2 });
+      doc.fillColor(GREY).fontSize(9).font('Helvetica')
+        .text('Student Clearance Management Platform', margin, margin + 34, { align: 'center', width: W - margin * 2 });
+      doc.fillColor(GREY).fontSize(8)
+        .text('Official Clearance Document – Not Valid Without QR Verification', margin, margin + 50, { align: 'center', width: W - margin * 2 });
+
+      // Green divider under header
+      doc.rect(margin, margin + headerH, W - margin * 2, 3).fill(GREEN);
+
+      // Title row
+      const titleY = margin + headerH + 14;
+      doc.rect(margin + 12, titleY + 9, 55, 3).fill(GREEN);
+      doc.rect(margin + 12, titleY + 15, 55, 1).fill(GREEN);
+      doc.fillColor(DARK).fontSize(18).font('Helvetica-Bold')
+        .text('STUDENT CLEARANCE CERTIFICATE', margin, titleY, { align: 'center', width: W - margin * 2 });
+      doc.rect(W - margin - 67, titleY + 9, 55, 3).fill(GREEN);
+      doc.rect(W - margin - 67, titleY + 15, 55, 1).fill(GREEN);
+
+      // Central pip bar
+      const pipY = titleY + 30;
+      [-4, 0, 4].forEach((offset) => {
+        doc.rect(W / 2 + offset - 2, pipY, 4, 10).fill(GREEN);
       });
 
-      doc.moveDown(3);
+      // Two-column layout
+      const bodyTop = pipY + 20;
+      const colGap = 18;
+      const colLeft = margin + 12;
+      const colW = (W - margin * 2 - colGap) / 2;
+      const colRight = colLeft + colW + colGap;
 
-      const issuedDate = new Date().toLocaleDateString();
-      doc.fontSize(12).text(`Date Issued: ${issuedDate}`, { align: 'left' });
+      // ─── LEFT COLUMN ────────────────────────────────────────────────────
+      let ly = bodyTop;
 
-      // Add QR Code
-      // Position it at the bottom right
-      doc.image(qrBuffer, doc.page.width - 200, doc.page.height - 200, { width: 100 });
-      doc.fontSize(8).text(`Token: ${token.substring(0, 8)}...`, doc.page.width - 200, doc.page.height - 90);
+      // Student Information section
+      doc.rect(colLeft, ly, 5, 14).fill(GREEN);
+      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+        .text('Student Information', colLeft + 10, ly + 1);
+      ly += 22;
+      doc.rect(colLeft, ly, colW, 0.5).fill('#CCCCCC');
+      ly += 8;
+
+      const valueX = colLeft + 130;
+      const rowH = 18;
+
+      [['Full Name', student.name || '—'], ['Email', student.email], ['Student ID', student.id.substring(0, 20) + '…']].forEach(([label, value]) => {
+        doc.rect(colLeft + 2, ly + 4, 3, 10).fill(GREEN);
+        doc.fillColor(GREY).fontSize(8).font('Helvetica-Bold').text(label, colLeft + 6, ly + 4);
+        doc.fillColor(DARK).fontSize(8).font('Helvetica').text(value, valueX, ly + 4, { width: colW - (valueX - colLeft), ellipsis: true });
+        ly += rowH;
+      });
+
+      ly += 10;
+
+      // Clearance Summary section
+      doc.rect(colLeft, ly, 5, 14).fill(GREEN);
+      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+        .text('Clearance Summary', colLeft + 10, ly + 1);
+      ly += 22;
+      doc.rect(colLeft, ly, colW, 0.5).fill('#CCCCCC');
+      ly += 8;
+
+      approvedRequests.forEach((req) => {
+        doc.rect(colLeft + 2, ly + 2, 42, 13).fill(GREEN);
+        doc.fillColor(WHITE).fontSize(7).font('Helvetica-Bold')
+          .text('CLEARED', colLeft + 2, ly + 5, { width: 42, align: 'center' });
+        doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold')
+          .text(req.department.name, colLeft + 50, ly + 3, { width: colW - 54, ellipsis: true });
+        doc.fillColor(GREY).fontSize(7).font('Helvetica')
+          .text('Status: Approved', colLeft + 50, ly + 13, { width: colW - 54 });
+        ly += 30;
+      });
+
+      // Final clearance statement
+      ly += 4;
+      doc.rect(colLeft, ly, 5, 14).fill(GREEN);
+      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+        .text('Final Clearance Statement', colLeft + 10, ly + 1);
+      ly += 20;
+      doc.fillColor(GREY).fontSize(8).font('Helvetica')
+        .text(
+          'This student has successfully completed all required clearance procedures and is hereby cleared by all listed departments.',
+          colLeft, ly, { width: colW },
+        );
+
+      // ─── RIGHT COLUMN ───────────────────────────────────────────────────
+      let ry = bodyTop;
+      const issuedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      // Student details card
+      doc.rect(colRight, ry, colW, 80).fill(LIGHT_GREEN);
+      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+        .text('Student Details', colRight + 10, ry + 8);
+      doc.rect(colRight + 10, ry + 22, colW - 20, 0.5).fill(GREEN);
+
+      let rly = ry + 28;
+      [['Date Issued', issuedDate], ['Departments', `${approvedRequests.length} Department(s) Cleared`]].forEach(([label, value]) => {
+        doc.fillColor(GREY).fontSize(8).font('Helvetica-Bold').text(label, colRight + 10, rly);
+        doc.fillColor(DARK).fontSize(8).font('Helvetica').text(value, colRight + 105, rly, { width: colW - 115 });
+        rly += 16;
+      });
+      ry += 94;
+
+      // Unique Certificate dashed box
+      doc.rect(colRight, ry, colW, 52)
+        .lineWidth(1).dash(4, { space: 3 }).strokeColor(GREEN).stroke();
+      doc.undash();
+      doc.fillColor(GREEN).fontSize(9).font('Helvetica-Bold')
+        .text('Unique Certificate', colRight + 8, ry + 8);
+      doc.fillColor(GREY).fontSize(7.5).font('Helvetica')
+        .text(
+          'This certificate is digitally verified. Scan the QR code to confirm authenticity and view student records.',
+          colRight + 8, ry + 22, { width: colW - 16 },
+        );
+      ry += 64;
+
+      // QR Code
+      const qrSize = 95;
+      const qrX = colRight + colW - qrSize - 4;
+      const qrY = H - margin - qrSize - 40;
+      doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold')
+        .text('Unique Certificate ID', colRight, qrY - 16, { width: colW });
+      doc.image(qrBuffer, qrX, qrY, { width: qrSize });
+      doc.fillColor(GREY).fontSize(6.5).font('Helvetica')
+        .text(token.substring(0, 24) + '…', qrX, qrY + qrSize + 4, { width: qrSize, align: 'center' });
+      doc.fillColor(GREY).fontSize(7).font('Helvetica')
+        .text(`Date generated: ${issuedDate}`, qrX, qrY + qrSize + 16, { width: qrSize, align: 'center' });
+
+      // Footer
+      const footerY = H - margin - 20;
+      doc.rect(margin, footerY, W - margin * 2, 0.5).fill(GREEN);
+      doc.fillColor(GREY).fontSize(7).font('Helvetica')
+        .text(
+          'This is a computer-generated document and is valid without a physical signature.',
+          margin, footerY + 6, { align: 'center', width: W - margin * 2 },
+        );
 
       doc.end();
     });
