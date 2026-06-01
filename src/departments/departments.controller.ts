@@ -23,6 +23,13 @@ export class DepartmentsController {
     return this.departmentsService.create(createDepartmentDto);
   }
 
+  @Get('active')
+  @Roles(Role.ADMIN, Role.DEPARTMENT_OFFICER, Role.STUDENT)
+  @ApiOperation({ summary: 'Get all active departments (All authenticated users)' })
+  findAllActive() {
+    return this.departmentsService.findAllActive();
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all departments (Admin only)' })
   findAll() {
