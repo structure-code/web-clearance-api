@@ -31,6 +31,18 @@ export class DepartmentsService {
     });
   }
 
+  async findAllActive() {
+    return this.prisma.department.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async findOne(id: string) {
     const department = await this.prisma.department.findUnique({
       where: { id },
