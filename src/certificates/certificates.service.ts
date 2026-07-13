@@ -64,8 +64,22 @@ export class CertificatesService {
       throw new InternalServerErrorException('Failed to generate QR code');
     }
 
-    // 4. Generate PDF
-    const pdfBuffer = await this.createPdfBuffer(student, approvedRequests, qrBuffer, verificationToken);
+    // 4. Fetch Logo Buffer
+    let logoBuffer: Buffer | undefined;
+    try {
+      const response = await fetch('https://i.postimg.cc/fb1TPJNz/adun-logo.jpg');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        logoBuffer = Buffer.from(arrayBuffer);
+      } else {
+        this.logger.warn(`Failed to fetch logo: ${response.statusText}`);
+      }
+    } catch (err) {
+      this.logger.error('Failed to fetch logo', err);
+    }
+
+    // 5. Generate PDF
+    const pdfBuffer = await this.createPdfBuffer(student, approvedRequests, qrBuffer, verificationToken, logoBuffer);
 
     // 5. Upload to S3
     const fileName = `certificate_${student.id.substring(0, 8)}_${Date.now()}.pdf`;
@@ -83,7 +97,7 @@ export class CertificatesService {
     return certificate;
   }
 
-  private createPdfBuffer(student: any, approvedRequests: any[], qrBuffer: Buffer, token: string): Promise<Buffer> {
+  private createPdfBuffer(student: any, approvedRequests: any[], qrBuffer: Buffer, token: string, logoBuffer?: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 0, layout: 'landscape' });
 
@@ -96,49 +110,56 @@ export class CertificatesService {
       const H = doc.page.height;
       const margin = 36;
 
-      const GREEN = '#1A6B3C';
-      const LIGHT_GREEN = '#E8F5EE';
+      const PURPLE = '#5C2D91';
+      const LIGHT_PURPLE = '#F3E8F5';
       const WHITE = '#FFFFFF';
       const DARK = '#111111';
       const GREY = '#555555';
 
       // Green corner triangles
       const cs = 90;
-      doc.save().polygon([0, 0], [cs, 0], [0, cs]).fill(GREEN).restore();
-      doc.save().polygon([W, 0], [W - cs, 0], [W, cs]).fill(GREEN).restore();
-      doc.save().polygon([0, H], [cs, H], [0, H - cs]).fill(GREEN).restore();
-      doc.save().polygon([W, H], [W - cs, H], [W, H - cs]).fill(GREEN).restore();
+      doc.save().polygon([0, 0], [cs, 0], [0, cs]).fill(PURPLE).restore();
+      doc.save().polygon([W, 0], [W - cs, 0], [W, cs]).fill(PURPLE).restore();
+      doc.save().polygon([0, H], [cs, H], [0, H - cs]).fill(PURPLE).restore();
+      doc.save().polygon([W, H], [W - cs, H], [W, H - cs]).fill(PURPLE).restore();
 
       // Outer border
       doc.rect(margin, margin, W - margin * 2, H - margin * 2)
-        .lineWidth(2).strokeColor(GREEN).stroke();
+        .lineWidth(2).strokeColor(PURPLE).stroke();
 
       // Header band
-      const headerH = 88;
+      const headerH = 95;
       doc.rect(margin, margin, W - margin * 2, headerH).fill(WHITE);
-      doc.fillColor(DARK).fontSize(16).font('Helvetica-Bold')
-        .text('WEB-CLEARANCE SYSTEM', margin, margin + 14, { align: 'center', width: W - margin * 2 });
-      doc.fillColor(GREY).fontSize(9).font('Helvetica')
-        .text('Student Clearance Management Platform', margin, margin + 34, { align: 'center', width: W - margin * 2 });
-      doc.fillColor(GREY).fontSize(8)
-        .text('Official Clearance Document – Not Valid Without QR Verification', margin, margin + 50, { align: 'center', width: W - margin * 2 });
+      
+      if (logoBuffer) {
+        doc.image(logoBuffer, margin + 20, margin + 15, { width: 60 });
+      }
 
-      // Green divider under header
-      doc.rect(margin, margin + headerH, W - margin * 2, 3).fill(GREEN);
+      doc.fillColor(DARK).fontSize(18).font('Helvetica-Bold')
+        .text('ADMIRALTY UNIVERSITY OF NIGERIA', margin, margin + 14, { align: 'center', width: W - margin * 2 });
+      doc.fillColor(PURPLE).fontSize(12).font('Helvetica-Bold')
+        .text('WEB-CLEARANCE SYSTEM', margin, margin + 36, { align: 'center', width: W - margin * 2 });
+      doc.fillColor(GREY).fontSize(9).font('Helvetica')
+        .text('Student Clearance Management Platform', margin, margin + 52, { align: 'center', width: W - margin * 2 });
+      doc.fillColor(GREY).fontSize(8)
+        .text('Official Clearance Document – Not Valid Without QR Verification', margin, margin + 68, { align: 'center', width: W - margin * 2 });
+
+      // Divider under header
+      doc.rect(margin, margin + headerH, W - margin * 2, 3).fill(PURPLE);
 
       // Title row
       const titleY = margin + headerH + 14;
-      doc.rect(margin + 12, titleY + 9, 55, 3).fill(GREEN);
-      doc.rect(margin + 12, titleY + 15, 55, 1).fill(GREEN);
+      doc.rect(margin + 12, titleY + 9, 55, 3).fill(PURPLE);
+      doc.rect(margin + 12, titleY + 15, 55, 1).fill(PURPLE);
       doc.fillColor(DARK).fontSize(18).font('Helvetica-Bold')
         .text('STUDENT CLEARANCE CERTIFICATE', margin, titleY, { align: 'center', width: W - margin * 2 });
-      doc.rect(W - margin - 67, titleY + 9, 55, 3).fill(GREEN);
-      doc.rect(W - margin - 67, titleY + 15, 55, 1).fill(GREEN);
+      doc.rect(W - margin - 67, titleY + 9, 55, 3).fill(PURPLE);
+      doc.rect(W - margin - 67, titleY + 15, 55, 1).fill(PURPLE);
 
       // Central pip bar
       const pipY = titleY + 30;
       [-4, 0, 4].forEach((offset) => {
-        doc.rect(W / 2 + offset - 2, pipY, 4, 10).fill(GREEN);
+        doc.rect(W / 2 + offset - 2, pipY, 4, 10).fill(PURPLE);
       });
 
       // Two-column layout
@@ -152,8 +173,8 @@ export class CertificatesService {
       let ly = bodyTop;
 
       // Student Information section
-      doc.rect(colLeft, ly, 5, 14).fill(GREEN);
-      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+      doc.rect(colLeft, ly, 5, 14).fill(PURPLE);
+      doc.fillColor(PURPLE).fontSize(10).font('Helvetica-Bold')
         .text('Student Information', colLeft + 10, ly + 1);
       ly += 22;
       doc.rect(colLeft, ly, colW, 0.5).fill('#CCCCCC');
@@ -163,7 +184,7 @@ export class CertificatesService {
       const rowH = 18;
 
       [['Full Name', student.name || '—'], ['Email', student.email], ['Student ID', student.id.substring(0, 20) + '…']].forEach(([label, value]) => {
-        doc.rect(colLeft + 2, ly + 4, 3, 10).fill(GREEN);
+        doc.rect(colLeft + 2, ly + 4, 3, 10).fill(PURPLE);
         doc.fillColor(GREY).fontSize(8).font('Helvetica-Bold').text(label, colLeft + 6, ly + 4);
         doc.fillColor(DARK).fontSize(8).font('Helvetica').text(value, valueX, ly + 4, { width: colW - (valueX - colLeft), ellipsis: true });
         ly += rowH;
@@ -172,15 +193,15 @@ export class CertificatesService {
       ly += 10;
 
       // Clearance Summary section
-      doc.rect(colLeft, ly, 5, 14).fill(GREEN);
-      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+      doc.rect(colLeft, ly, 5, 14).fill(PURPLE);
+      doc.fillColor(PURPLE).fontSize(10).font('Helvetica-Bold')
         .text('Clearance Summary', colLeft + 10, ly + 1);
       ly += 22;
       doc.rect(colLeft, ly, colW, 0.5).fill('#CCCCCC');
       ly += 8;
 
       approvedRequests.forEach((req) => {
-        doc.rect(colLeft + 2, ly + 2, 42, 13).fill(GREEN);
+        doc.rect(colLeft + 2, ly + 2, 42, 13).fill(PURPLE);
         doc.fillColor(WHITE).fontSize(7).font('Helvetica-Bold')
           .text('CLEARED', colLeft + 2, ly + 5, { width: 42, align: 'center' });
         doc.fillColor(DARK).fontSize(8).font('Helvetica-Bold')
@@ -192,8 +213,8 @@ export class CertificatesService {
 
       // Final clearance statement
       ly += 4;
-      doc.rect(colLeft, ly, 5, 14).fill(GREEN);
-      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+      doc.rect(colLeft, ly, 5, 14).fill(PURPLE);
+      doc.fillColor(PURPLE).fontSize(10).font('Helvetica-Bold')
         .text('Final Clearance Statement', colLeft + 10, ly + 1);
       ly += 20;
       doc.fillColor(GREY).fontSize(8).font('Helvetica')
@@ -207,10 +228,10 @@ export class CertificatesService {
       const issuedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
       // Student details card
-      doc.rect(colRight, ry, colW, 80).fill(LIGHT_GREEN);
-      doc.fillColor(GREEN).fontSize(10).font('Helvetica-Bold')
+      doc.rect(colRight, ry, colW, 80).fill(LIGHT_PURPLE);
+      doc.fillColor(PURPLE).fontSize(10).font('Helvetica-Bold')
         .text('Student Details', colRight + 10, ry + 8);
-      doc.rect(colRight + 10, ry + 22, colW - 20, 0.5).fill(GREEN);
+      doc.rect(colRight + 10, ry + 22, colW - 20, 0.5).fill(PURPLE);
 
       let rly = ry + 28;
       [['Date Issued', issuedDate], ['Departments', `${approvedRequests.length} Department(s) Cleared`]].forEach(([label, value]) => {
@@ -222,9 +243,9 @@ export class CertificatesService {
 
       // Unique Certificate dashed box
       doc.rect(colRight, ry, colW, 52)
-        .lineWidth(1).dash(4, { space: 3 }).strokeColor(GREEN).stroke();
+        .lineWidth(1).dash(4, { space: 3 }).strokeColor(PURPLE).stroke();
       doc.undash();
-      doc.fillColor(GREEN).fontSize(9).font('Helvetica-Bold')
+      doc.fillColor(PURPLE).fontSize(9).font('Helvetica-Bold')
         .text('Unique Certificate', colRight + 8, ry + 8);
       doc.fillColor(GREY).fontSize(7.5).font('Helvetica')
         .text(
@@ -247,7 +268,7 @@ export class CertificatesService {
 
       // Footer
       const footerY = H - margin - 20;
-      doc.rect(margin, footerY, W - margin * 2, 0.5).fill(GREEN);
+      doc.rect(margin, footerY, W - margin * 2, 0.5).fill(PURPLE);
       doc.fillColor(GREY).fontSize(7).font('Helvetica')
         .text(
           'This is a computer-generated document and is valid without a physical signature.',
