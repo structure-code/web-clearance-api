@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateClearanceRequestDto } from './dto/create-clearance-request.dto';
+import { CreateBulkClearanceRequestDto } from './dto/create-bulk-clearance-request.dto';
 import { UpdateClearanceStatusDto } from './dto/update-clearance-status.dto';
 import { User, ClearanceStatus, Role } from '@prisma/client';
 
@@ -18,42 +18,70 @@ export class ClearanceRequestsService {
     private certificatesService: CertificatesService,
   ) {}
 
-  async create(user: User, createDto: CreateClearanceRequestDto) {
-    // Check if the department is active
-    const department = await this.prisma.department.findUnique({
-      where: { id: createDto.departmentId },
+  async createBulk(user: User, createDto: CreateBulkClearanceRequestDto) {
+    // Fetch all active departments
+    const activeDepartments = await this.prisma.department.findMany({
+      where: { isActive: true },
     });
 
-    if (!department || !department.isActive) {
-      throw new NotFoundException('Department not found or inactive');
+    if (activeDepartments.length === 0) {
+      throw new ConflictException('There are no active departments for clearance at this time.');
     }
 
-    // Ensure student hasn't already requested clearance from this department
-    const existing = await this.prisma.clearanceRequest.findUnique({
+    // Ensure student hasn't already requested clearance for ANY of these departments
+    const existingRequests = await this.prisma.clearanceRequest.findMany({
       where: {
-        studentId_departmentId: {
-          studentId: user.id,
-          departmentId: createDto.departmentId,
-        },
+        studentId: user.id,
       },
     });
 
-    if (existing) {
-      throw new ConflictException('You have already submitted a clearance request for this department');
+    if (existingRequests.length > 0) {
+      throw new ConflictException('You have already initiated clearance requests.');
     }
 
-    return this.prisma.clearanceRequest.create({
-      data: {
-        studentId: user.id,
-        departmentId: createDto.departmentId,
-        documents: {
-          create: createDto.documents,
-        },
-      },
-      include: {
-        documents: true,
-      },
+    // Map provided submissions
+    const submissionsMap = new Map();
+    if (createDto.submissions) {
+      for (const sub of createDto.submissions) {
+        submissionsMap.set(sub.departmentId, sub.documents || []);
+      }
+    }
+
+    // Validate requirements
+    for (const dept of activeDepartments) {
+      if (dept.requiresDocument) {
+        const providedDocs = submissionsMap.get(dept.id);
+        if (!providedDocs || providedDocs.length === 0) {
+          throw new BadRequestException(`Department ${dept.name} requires a document submission: ${dept.requiredDocumentDescription || 'No description provided.'}`);
+        }
+      }
+    }
+
+    // Execute in transaction
+    const createdRequests = await this.prisma.$transaction(async (prisma) => {
+      const requests: any[] = [];
+      for (const dept of activeDepartments) {
+        const documents = submissionsMap.get(dept.id) || [];
+        
+        const request = await prisma.clearanceRequest.create({
+          data: {
+            studentId: user.id,
+            departmentId: dept.id,
+            documents: {
+              create: documents,
+            },
+          },
+          include: {
+            documents: true,
+            department: true,
+          }
+        });
+        requests.push(request);
+      }
+      return requests;
     });
+
+    return createdRequests;
   }
 
   async findAll(user: User) {
@@ -144,12 +172,32 @@ export class ClearanceRequestsService {
       throw new ForbiddenException('You can only modify clearance requests for your department');
     }
 
+    let dataToUpdate: any = { status };
+
+    if (status === ClearanceStatus.REJECTED) {
+      if (!updateDto.remarks || updateDto.remarks.trim() === '') {
+        throw new BadRequestException('Remarks are compulsory when rejecting a clearance request.');
+      }
+      dataToUpdate.remarks = updateDto.remarks;
+    } else if (status === ClearanceStatus.APPROVED) {
+      if (!user.signatureUrl) {
+        throw new BadRequestException('You must upload your signature before approving clearance requests.');
+      }
+      dataToUpdate.clearedByOfficerName = user.name || 'Unknown Officer';
+      dataToUpdate.clearedBySignatureUrl = user.signatureUrl;
+      dataToUpdate.clearedAt = new Date();
+      if (updateDto.remarks) {
+        dataToUpdate.remarks = updateDto.remarks;
+      }
+    } else {
+      if (updateDto.remarks) {
+        dataToUpdate.remarks = updateDto.remarks;
+      }
+    }
+
     const updated = await this.prisma.clearanceRequest.update({
       where: { id },
-      data: {
-        status,
-        remarks: updateDto.remarks,
-      },
+      data: dataToUpdate,
     });
 
     // Log the activity
