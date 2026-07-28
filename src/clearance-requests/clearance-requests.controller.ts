@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, UseGuards, Ip, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import { ClearanceRequestsService } from './clearance-requests.service';
-import { CreateClearanceRequestDto } from './dto/create-clearance-request.dto';
+import { CreateBulkClearanceRequestDto } from './dto/create-bulk-clearance-request.dto';
 import { UpdateClearanceStatusDto } from './dto/update-clearance-status.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -19,9 +19,9 @@ export class ClearanceRequestsController {
 
   @Post()
   @Roles(Role.STUDENT)
-  @ApiOperation({ summary: 'Submit a clearance request (Student only)' })
-  create(@CurrentUser() user: User, @Body() createDto: CreateClearanceRequestDto) {
-    return this.clearanceRequestsService.create(user, createDto);
+  @ApiOperation({ summary: 'Submit clearance requests for all active departments (Student only)' })
+  createBulk(@CurrentUser() user: User, @Body() createDto: CreateBulkClearanceRequestDto) {
+    return this.clearanceRequestsService.createBulk(user, createDto);
   }
 
   @Get()

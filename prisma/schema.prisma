@@ -17,6 +17,8 @@ model Department {
   name      String   @unique
   code      String   @unique
   isActive  Boolean  @default(true)
+  requiresDocument Boolean @default(false)
+  requiredDocumentDescription String?
   users     User[]
   clearanceRequests ClearanceRequest[]
   createdAt DateTime @default(now())
@@ -33,6 +35,7 @@ model User {
   isEmailVerified  Boolean     @default(false)
   emailVerifyToken String?     @unique
   isActive         Boolean     @default(true)
+  signatureUrl     String?
   
   departmentId     String?
   department       Department? @relation(fields: [departmentId], references: [id])
@@ -66,6 +69,10 @@ model ClearanceRequest {
   
   status       ClearanceStatus @default(PENDING)
   remarks      String?         @db.Text
+  
+  clearedByOfficerName  String?
+  clearedBySignatureUrl String?
+  clearedAt             DateTime?
   
   documents    Document[]
   
