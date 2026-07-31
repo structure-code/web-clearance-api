@@ -2,7 +2,7 @@ import { Controller, Post, Body, Res, Req, HttpCode, HttpStatus, Get, Query, Use
 import { ApiTags, ApiOperation, ApiResponse, ApiCookieAuth } from '@nestjs/swagger';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto, UpdateProfileDto, ChangePasswordDto } from './dto/auth.dto';
+import { AdminLoginDto, StudentLoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto, UpdateProfileDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
@@ -34,11 +34,34 @@ export class AuthController {
     return this.authService.verifyEmail(verifyEmailDto.token);
   }
 
-  @Post('login')
+  @Post('admin/login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login a user' })
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
-    const { accessToken, refreshToken, user } = await this.authService.login(loginDto);
+  @ApiOperation({ summary: 'Login an admin or staff' })
+  async adminLogin(@Body() adminLoginDto: AdminLoginDto, @Res({ passthrough: true }) response: Response) {
+    const { accessToken, refreshToken, user } = await this.authService.adminLogin(adminLoginDto);
+
+    response.cookie('Authentication', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    response.cookie('Refresh', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return { user };
+  }
+
+  @Post('student/login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login a student using Matric No' })
+  async studentLogin(@Body() studentLoginDto: StudentLoginDto, @Res({ passthrough: true }) response: Response) {
+    const { accessToken, refreshToken, user } = await this.authService.studentLogin(studentLoginDto);
 
     response.cookie('Authentication', accessToken, {
       httpOnly: true,

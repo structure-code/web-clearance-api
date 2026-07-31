@@ -74,6 +74,10 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  async findByMatricNo(matricNo: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { matricNo } });
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
   }
