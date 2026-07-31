@@ -5,8 +5,8 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
-import { LoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto, UpdateProfileDto, ChangePasswordDto } from './dto/auth.dto';
-import { User } from '@prisma/client';
+import { AdminLoginDto, StudentLoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto, UpdateProfileDto, ChangePasswordDto } from './dto/auth.dto';
+import { User, Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +19,7 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  async validateUser(email: string, pass: string): Promise<User | null> {
+  async validateAdminUser(email: string, pass: string): Promise<User | null> {
     const user = await this.usersService.findByEmail(email);
     if (user && await bcrypt.compare(pass, user.password)) {
       return user;
@@ -27,14 +27,21 @@ export class AuthService {
     return null;
   }
 
+  async validateStudentUser(matricNo: string, pass: string): Promise<User | null> {
+    const user = await this.usersService.findByMatricNo(matricNo);
+    if (user && user.role === Role.STUDENT && await bcrypt.compare(pass, user.password)) {
+      return user;
+    }
+    return null;
+  }
+
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.usersService.findByEmail(registerDto.email);
+    const existingUser = await this.usersService.findByMatricNo(registerDto.matricNo);
     if (existingUser) {
-      throw new BadRequestException('Email is already in use');
+      throw new BadRequestException('Matriculation number is already in use');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-    const emailVerifyToken = crypto.randomBytes(32).toString('hex');
 
     let facultyId: string | undefined = undefined;
     if (registerDto.departmentId) {
@@ -44,26 +51,20 @@ export class AuthService {
     }
 
     const user = await this.usersService.create({
-      email: registerDto.email,
+      matricNo: registerDto.matricNo,
       password: hashedPassword,
       name: registerDto.name,
-      emailVerifyToken,
+      role: Role.STUDENT,
+      isEmailVerified: true, // No email verification required for students
       department: { connect: { id: registerDto.departmentId } },
       ...(facultyId ? { faculty: { connect: { id: facultyId } } } : {})
     });
 
-    try {
-      await this.mailService.sendVerificationEmail(user.email, emailVerifyToken);
-    } catch (error) {
-      this.logger.error('Failed to send verification email during registration', error);
-      // We still return success as user is created, they can request another email later
-    }
-
-    return { message: 'Registration successful. Please check your email to verify your account.' };
+    return { message: 'Registration successful. You can now login using your Matric No.' };
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
+  async adminLogin(adminLoginDto: AdminLoginDto) {
+    const user = await this.validateAdminUser(adminLoginDto.email, adminLoginDto.password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -72,6 +73,18 @@ export class AuthService {
     }
     if (!user.isEmailVerified) {
       throw new UnauthorizedException('Please verify your email address before logging in.');
+    }
+
+    return this.generateTokens(user);
+  }
+
+  async studentLogin(studentLoginDto: StudentLoginDto) {
+    const user = await this.validateStudentUser(studentLoginDto.matricNo, studentLoginDto.password);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Your account has been disabled. Please contact support.');
     }
 
     return this.generateTokens(user);
@@ -129,7 +142,7 @@ export class AuthService {
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const user = await this.usersService.findByEmail(forgotPasswordDto.email);
-    if (!user) {
+    if (!user || !user.email) {
       // Return a generic message even if user not found to prevent email enumeration
       return { message: 'If that email address is in our database, we will send you an email to reset your password.' };
     }

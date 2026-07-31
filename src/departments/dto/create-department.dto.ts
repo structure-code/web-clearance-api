@@ -22,8 +22,8 @@ export class CreateDepartmentDto {
   @IsOptional()
   requiredDocumentDescription?: string;
 
-  @ApiProperty({ example: 'uuid-faculty-id', required: false })
+  @ApiProperty({ example: 'uuid-faculty-id', required: true })
   @IsString()
-  @IsOptional()
-  facultyId?: string;
+  @IsNotEmpty()
+  facultyId!: string;
 }
