@@ -36,11 +36,20 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
     const emailVerifyToken = crypto.randomBytes(32).toString('hex');
 
+    let facultyId: string | undefined = undefined;
+    if (registerDto.departmentId) {
+      const dept = await this.usersService['prisma'].department.findUnique({ where: { id: registerDto.departmentId } });
+      if (!dept) throw new BadRequestException('Department not found');
+      facultyId = dept.facultyId || undefined;
+    }
+
     const user = await this.usersService.create({
       email: registerDto.email,
       password: hashedPassword,
       name: registerDto.name,
       emailVerifyToken,
+      department: { connect: { id: registerDto.departmentId } },
+      ...(facultyId ? { faculty: { connect: { id: facultyId } } } : {})
     });
 
     try {

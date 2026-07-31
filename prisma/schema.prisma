@@ -9,7 +9,24 @@ datasource db {
 enum Role {
   STUDENT
   DEPARTMENT_OFFICER
+  FACULTY_OFFICER
   ADMIN
+}
+
+model Faculty {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  requiresDocument Boolean @default(false)
+  requiredDocumentDescription String?
+  
+  departments Department[]
+  users     User[]
+  clearanceRequests ClearanceRequest[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Department {
@@ -19,6 +36,10 @@ model Department {
   isActive  Boolean  @default(true)
   requiresDocument Boolean @default(false)
   requiredDocumentDescription String?
+  
+  facultyId String?
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
+
   users     User[]
   clearanceRequests ClearanceRequest[]
   createdAt DateTime @default(now())
@@ -39,6 +60,9 @@ model User {
   
   departmentId     String?
   department       Department? @relation(fields: [departmentId], references: [id])
+  
+  facultyId        String?
+  faculty          Faculty?    @relation(fields: [facultyId], references: [id])
   
   resetToken       String?     @unique
   resetTokenExpiry DateTime?
@@ -64,8 +88,11 @@ model ClearanceRequest {
   studentId    String
   student      User            @relation("StudentClearance", fields: [studentId], references: [id])
   
-  departmentId String
-  department   Department      @relation(fields: [departmentId], references: [id])
+  departmentId String?
+  department   Department?      @relation(fields: [departmentId], references: [id])
+  
+  facultyId    String?
+  faculty      Faculty?         @relation(fields: [facultyId], references: [id])
   
   status       ClearanceStatus @default(PENDING)
   remarks      String?         @db.Text
@@ -78,8 +105,6 @@ model ClearanceRequest {
   
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
-
-  @@unique([studentId, departmentId])
 }
 
 model Document {
