@@ -62,6 +62,11 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   departmentId?: string;
+
+  @ApiProperty({ example: 'https://bucket.s3.region.amazonaws.com/signature.png', required: false, description: 'URL of the officer signature image, obtained via POST /files/upload' })
+  @IsOptional()
+  @IsString()
+  signatureUrl?: string;
 }
 
 export class ChangePasswordDto {

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsBoolean, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateDepartmentDto {
@@ -11,4 +11,14 @@ export class CreateDepartmentDto {
   @IsString()
   @IsNotEmpty()
   code!: string;
+
+  @ApiProperty({ example: false, required: false, description: 'Whether students must attach a supporting document when requesting clearance from this department' })
+  @IsBoolean()
+  @IsOptional()
+  requiresDocument?: boolean;
+
+  @ApiProperty({ example: 'Upload your library clearance slip', required: false, description: 'Shown to students when requiresDocument is true' })
+  @IsString()
+  @IsOptional()
+  requiredDocumentDescription?: string;
 }

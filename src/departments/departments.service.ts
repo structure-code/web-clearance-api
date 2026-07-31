@@ -38,6 +38,8 @@ export class DepartmentsService {
         id: true,
         name: true,
         code: true,
+        requiresDocument: true,
+        requiredDocumentDescription: true,
       },
       orderBy: { name: 'asc' },
     });
