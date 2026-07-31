@@ -12,6 +12,7 @@ import { ClearanceRequestsModule } from './clearance-requests/clearance-requests
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CertificatesModule } from './certificates/certificates.module';
+import { FacultiesModule } from './faculties/faculties.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -30,6 +31,7 @@ import configuration from './config/configuration';
     ActivityLogsModule,
     NotificationsModule,
     CertificatesModule,
+    FacultiesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

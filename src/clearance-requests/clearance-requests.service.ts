@@ -19,13 +19,17 @@ export class ClearanceRequestsService {
   ) {}
 
   async createBulk(user: User, createDto: CreateBulkClearanceRequestDto) {
-    // Fetch all active departments
+    // Fetch all active departments and faculties
     const activeDepartments = await this.prisma.department.findMany({
       where: { isActive: true },
     });
+    
+    const activeFaculties = await this.prisma.faculty.findMany({
+      where: { isActive: true },
+    });
 
-    if (activeDepartments.length === 0) {
-      throw new ConflictException('There are no active departments for clearance at this time.');
+    if (activeDepartments.length === 0 && activeFaculties.length === 0) {
+      throw new ConflictException('There are no active departments or faculties for clearance at this time.');
     }
 
     // Ensure student hasn't already requested clearance for ANY of these departments
@@ -43,16 +47,25 @@ export class ClearanceRequestsService {
     const submissionsMap = new Map();
     if (createDto.submissions) {
       for (const sub of createDto.submissions) {
-        submissionsMap.set(sub.departmentId, sub.documents || []);
+        if (sub.departmentId) submissionsMap.set(`dept_${sub.departmentId}`, sub.documents || []);
+        if (sub.facultyId) submissionsMap.set(`fac_${sub.facultyId}`, sub.documents || []);
       }
     }
 
     // Validate requirements
     for (const dept of activeDepartments) {
       if (dept.requiresDocument) {
-        const providedDocs = submissionsMap.get(dept.id);
+        const providedDocs = submissionsMap.get(`dept_${dept.id}`);
         if (!providedDocs || providedDocs.length === 0) {
           throw new BadRequestException(`Department ${dept.name} requires a document submission: ${dept.requiredDocumentDescription || 'No description provided.'}`);
+        }
+      }
+    }
+    for (const fac of activeFaculties) {
+      if (fac.requiresDocument) {
+        const providedDocs = submissionsMap.get(`fac_${fac.id}`);
+        if (!providedDocs || providedDocs.length === 0) {
+          throw new BadRequestException(`Faculty ${fac.name} requires a document submission: ${fac.requiredDocumentDescription || 'No description provided.'}`);
         }
       }
     }
@@ -61,7 +74,7 @@ export class ClearanceRequestsService {
     const createdRequests = await this.prisma.$transaction(async (prisma) => {
       const requests: any[] = [];
       for (const dept of activeDepartments) {
-        const documents = submissionsMap.get(dept.id) || [];
+        const documents = submissionsMap.get(`dept_${dept.id}`) || [];
         
         const request = await prisma.clearanceRequest.create({
           data: {
@@ -78,6 +91,25 @@ export class ClearanceRequestsService {
         });
         requests.push(request);
       }
+
+      for (const fac of activeFaculties) {
+        const documents = submissionsMap.get(`fac_${fac.id}`) || [];
+        
+        const request = await prisma.clearanceRequest.create({
+          data: {
+            studentId: user.id,
+            facultyId: fac.id,
+            documents: {
+              create: documents,
+            },
+          },
+          include: {
+            documents: true,
+            faculty: true,
+          }
+        });
+        requests.push(request);
+      }
       return requests;
     });
 
@@ -88,7 +120,7 @@ export class ClearanceRequestsService {
     if (user.role === Role.STUDENT) {
       return this.prisma.clearanceRequest.findMany({
         where: { studentId: user.id },
-        include: { department: true, documents: true },
+        include: { department: true, faculty: true, documents: true },
       });
     }
 
@@ -102,11 +134,22 @@ export class ClearanceRequestsService {
       });
     }
 
+    if (user.role === Role.FACULTY_OFFICER) {
+      if (!user.facultyId) {
+        return [];
+      }
+      return this.prisma.clearanceRequest.findMany({
+        where: { facultyId: user.facultyId },
+        include: { student: { select: { id: true, name: true, email: true } }, documents: true },
+      });
+    }
+
     // ADMIN sees all
     return this.prisma.clearanceRequest.findMany({
       include: {
         student: { select: { id: true, name: true, email: true } },
         department: true,
+        faculty: true,
       },
     });
   }
@@ -117,6 +160,7 @@ export class ClearanceRequestsService {
       include: {
         student: { select: { id: true, name: true, email: true } },
         department: true,
+        faculty: true,
         documents: true,
       },
     });
@@ -134,14 +178,19 @@ export class ClearanceRequestsService {
       throw new ForbiddenException('You can only view clearance requests for your department');
     }
 
+    if (user.role === Role.FACULTY_OFFICER && request.facultyId !== user.facultyId) {
+      throw new ForbiddenException('You can only view clearance requests for your faculty');
+    }
+
     // Auto transition PENDING to UNDER_REVIEW when officer views it
-    if (user.role === Role.DEPARTMENT_OFFICER && request.status === ClearanceStatus.PENDING) {
+    if ((user.role === Role.DEPARTMENT_OFFICER || user.role === Role.FACULTY_OFFICER) && request.status === ClearanceStatus.PENDING) {
       const updated = await this.prisma.clearanceRequest.update({
         where: { id },
         data: { status: ClearanceStatus.UNDER_REVIEW },
         include: {
           student: { select: { id: true, name: true, email: true } },
           department: true,
+          faculty: true,
           documents: true,
         },
       });
@@ -161,7 +210,7 @@ export class ClearanceRequestsService {
   ) {
     const request = await this.prisma.clearanceRequest.findUnique({
       where: { id },
-      include: { department: true },
+      include: { department: true, faculty: true },
     });
 
     if (!request) {
@@ -170,6 +219,10 @@ export class ClearanceRequestsService {
 
     if (user.role === Role.DEPARTMENT_OFFICER && request.departmentId !== user.departmentId) {
       throw new ForbiddenException('You can only modify clearance requests for your department');
+    }
+
+    if (user.role === Role.FACULTY_OFFICER && request.facultyId !== user.facultyId) {
+      throw new ForbiddenException('You can only modify clearance requests for your faculty');
     }
 
     let dataToUpdate: any = { status };
@@ -214,7 +267,7 @@ export class ClearanceRequestsService {
       await this.notificationsService.createNotification(
         request.studentId,
         'Clearance Request Approved',
-        `Your clearance request for ${request.department.name} has been approved.`,
+        `Your clearance request for ${request.department?.name || request.faculty?.name} has been approved.`,
         NotificationType.SUCCESS,
       );
       await this.checkAndCompleteStudentClearance(request.studentId);
@@ -222,7 +275,7 @@ export class ClearanceRequestsService {
       await this.notificationsService.createNotification(
         request.studentId,
         'Clearance Request Rejected',
-        `Your clearance request for ${request.department.name} has been rejected. Remarks: ${updateDto.remarks || 'None'}`,
+        `Your clearance request for ${request.department?.name || request.faculty?.name} has been rejected. Remarks: ${updateDto.remarks || 'None'}`,
         NotificationType.ERROR,
       );
     }
@@ -231,8 +284,11 @@ export class ClearanceRequestsService {
   }
 
   async checkAndCompleteStudentClearance(studentId: string) {
-    // Check if the student has APPROVED requests for ALL active departments
+    // Check if the student has APPROVED requests for ALL active departments and ALL active faculties
     const activeDepartmentsCount = await this.prisma.department.count({
+      where: { isActive: true },
+    });
+    const activeFacultiesCount = await this.prisma.faculty.count({
       where: { isActive: true },
     });
 
@@ -240,11 +296,14 @@ export class ClearanceRequestsService {
       where: {
         studentId,
         status: ClearanceStatus.APPROVED,
-        department: { isActive: true },
+        OR: [
+          { department: { isActive: true } },
+          { faculty: { isActive: true } },
+        ]
       },
     });
 
-    if (activeDepartmentsCount > 0 && approvedRequestsCount === activeDepartmentsCount) {
+    if ((activeDepartmentsCount + activeFacultiesCount) > 0 && approvedRequestsCount === (activeDepartmentsCount + activeFacultiesCount)) {
       // Mark all of the student's requests as COMPLETED
       await this.prisma.clearanceRequest.updateMany({
         where: { studentId },

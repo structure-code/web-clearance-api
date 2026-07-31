@@ -24,7 +24,13 @@ export class RegisterDto {
 
   @ApiProperty({ example: 'John Doe', required: false })
   @IsString()
+  @IsOptional()
   name?: string;
+
+  @ApiProperty({ example: 'uuid-department-id' })
+  @IsString()
+  @IsNotEmpty()
+  departmentId!: string;
 }
 
 export class ForgotPasswordDto {

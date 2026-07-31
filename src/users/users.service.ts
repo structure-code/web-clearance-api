@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, User, Role } from '@prisma/client';
 
@@ -16,9 +16,18 @@ export class UsersService {
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    
+    let facultyId = createUserDto.facultyId;
+    if (createUserDto.departmentId && !facultyId) {
+      const dept = await this.prisma.department.findUnique({ where: { id: createUserDto.departmentId } });
+      if (!dept) throw new BadRequestException('Department not found');
+      facultyId = dept.facultyId || undefined;
+    }
+
     return this.prisma.user.create({
       data: {
         ...createUserDto,
+        facultyId,
         password: hashedPassword,
         isEmailVerified: true, // Auto-verify users created by Admin
       },
@@ -35,6 +44,7 @@ export class UsersService {
         isActive: true,
         isEmailVerified: true,
         departmentId: true,
+        facultyId: true,
         createdAt: true,
         updatedAt: true,
       },
