@@ -23,6 +23,10 @@ export class DepartmentSubmissionDto {
 }
 
 export class CreateBulkClearanceRequestDto {
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', description: 'An active academic session ID' })
+  @IsUUID()
+  academicSessionId!: string;
+
   @ApiProperty({ type: [DepartmentSubmissionDto] })
   @IsArray()
   @ValidateNested({ each: true })

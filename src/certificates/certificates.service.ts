@@ -17,12 +17,13 @@ export class CertificatesService {
     private configService: ConfigService,
   ) {}
 
-  async generateCertificate(studentId: string) {
+  async generateCertificate(studentId: string, academicSessionId: string) {
     // 1. Fetch student and all clearance requests
     const student = await this.prisma.user.findUnique({
       where: { id: studentId },
       include: {
         clearanceRequests: {
+          where: { academicSessionId },
           include: { department: true },
         },
       },
@@ -86,11 +87,18 @@ export class CertificatesService {
     const uploadResult = await this.filesService.uploadBuffer(pdfBuffer, fileName, 'application/pdf');
 
     // 6. Save Certificate Record
-    const certificate = await this.prisma.certificate.create({
-      data: {
+    const certificate = await this.prisma.certificate.upsert({
+      where: { studentId_academicSessionId: { studentId, academicSessionId } },
+      create: {
         studentId,
+        academicSessionId,
         verificationToken,
         fileUrl: uploadResult.fileUrl,
+      },
+      update: {
+        verificationToken,
+        fileUrl: uploadResult.fileUrl,
+        issuedAt: new Date(),
       },
     });
 
@@ -302,16 +310,16 @@ export class CertificatesService {
     };
   }
 
-  async getMyCertificate(studentId: string) {
+  async getMyCertificate(studentId: string, academicSessionId: string) {
     let certificate = await this.prisma.certificate.findUnique({
-      where: { studentId },
+      where: { studentId_academicSessionId: { studentId, academicSessionId } },
     });
 
     if (!certificate) {
       // Check if they are eligible to have one (maybe generation failed previously)
       const student = await this.prisma.user.findUnique({
         where: { id: studentId },
-        include: { clearanceRequests: true },
+        include: { clearanceRequests: { where: { academicSessionId } } },
       });
 
       if (student) {
@@ -325,7 +333,7 @@ export class CertificatesService {
 
         if (activeDepartmentsCount > 0 && completedRequests.length === activeDepartmentsCount) {
           // Generate the missing certificate
-          certificate = await this.generateCertificate(studentId);
+          certificate = await this.generateCertificate(studentId, academicSessionId);
           return certificate;
         }
       }

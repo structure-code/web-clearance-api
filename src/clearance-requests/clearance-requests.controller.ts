@@ -19,7 +19,7 @@ export class ClearanceRequestsController {
 
   @Post()
   @Roles(Role.STUDENT)
-  @ApiOperation({ summary: 'Submit clearance requests for all active departments (Student only)' })
+  @ApiOperation({ summary: 'Submit clearance requests for an active academic session (Student only)' })
   createBulk(@CurrentUser() user: User, @Body() createDto: CreateBulkClearanceRequestDto) {
     return this.clearanceRequestsService.createBulk(user, createDto);
   }

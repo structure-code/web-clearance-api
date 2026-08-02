@@ -23,10 +23,17 @@ export class ClearanceRequestsService {
       throw new BadRequestException('You must be associated with a program correctly linked to a faculty to submit a clearance request.');
     }
 
-    // Fetch all active departments and the student's faculty
-    const activeDepartments = await this.prisma.department.findMany({
-      where: { isActive: true },
+    // A clearance request must belong to an active, administrator-managed session.
+    const academicSession = await this.prisma.academicSession.findFirst({
+      where: { id: createDto.academicSessionId, isActive: true },
     });
+
+    if (!academicSession) {
+      throw new BadRequestException('The selected academic session is unavailable or inactive.');
+    }
+
+    // Fetch all active departments and the student's faculty
+    const activeDepartments = await this.prisma.department.findMany({ where: { isActive: true } });
     
     const studentFaculty = await this.prisma.faculty.findUnique({
       where: { id: user.facultyId },
@@ -40,6 +47,7 @@ export class ClearanceRequestsService {
     const existingRequests = await this.prisma.clearanceRequest.findMany({
       where: {
         studentId: user.id,
+        academicSessionId: academicSession.id,
       },
     });
 
@@ -81,6 +89,7 @@ export class ClearanceRequestsService {
         const request = await prisma.clearanceRequest.create({
           data: {
             studentId: user.id,
+            academicSessionId: academicSession.id,
             departmentId: dept.id,
             documents: {
               create: documents,
@@ -100,6 +109,7 @@ export class ClearanceRequestsService {
         const request = await prisma.clearanceRequest.create({
           data: {
             studentId: user.id,
+            academicSessionId: academicSession.id,
             facultyId: studentFaculty.id,
             documents: {
               create: documents,
@@ -122,7 +132,7 @@ export class ClearanceRequestsService {
     if (user.role === Role.STUDENT) {
       return this.prisma.clearanceRequest.findMany({
         where: { studentId: user.id },
-        include: { department: true, faculty: true, documents: true },
+        include: { academicSession: true, department: true, faculty: true, documents: true },
       });
     }
 
@@ -132,7 +142,7 @@ export class ClearanceRequestsService {
       }
       return this.prisma.clearanceRequest.findMany({
         where: { departmentId: user.departmentId },
-        include: { student: { select: { id: true, name: true, email: true } }, documents: true },
+        include: { academicSession: true, student: { select: { id: true, name: true, email: true } }, documents: true },
       });
     }
 
@@ -142,7 +152,7 @@ export class ClearanceRequestsService {
       }
       return this.prisma.clearanceRequest.findMany({
         where: { facultyId: user.facultyId },
-        include: { student: { select: { id: true, name: true, email: true } }, documents: true },
+        include: { academicSession: true, student: { select: { id: true, name: true, email: true } }, documents: true },
       });
     }
 
@@ -150,6 +160,7 @@ export class ClearanceRequestsService {
     return this.prisma.clearanceRequest.findMany({
       include: {
         student: { select: { id: true, name: true, email: true } },
+        academicSession: true,
         department: true,
         faculty: true,
       },
@@ -161,6 +172,7 @@ export class ClearanceRequestsService {
       where: { id },
       include: {
         student: { select: { id: true, name: true, email: true } },
+        academicSession: true,
         department: true,
         faculty: true,
         documents: true,
@@ -191,6 +203,7 @@ export class ClearanceRequestsService {
         data: { status: ClearanceStatus.UNDER_REVIEW },
         include: {
           student: { select: { id: true, name: true, email: true } },
+          academicSession: true,
           department: true,
           faculty: true,
           documents: true,
@@ -272,7 +285,7 @@ export class ClearanceRequestsService {
         `Your clearance request for ${request.department?.name || request.faculty?.name} has been approved.`,
         NotificationType.SUCCESS,
       );
-      await this.checkAndCompleteStudentClearance(request.studentId);
+      await this.checkAndCompleteStudentClearance(request.studentId, request.academicSessionId);
     } else if (status === ClearanceStatus.REJECTED) {
       await this.notificationsService.createNotification(
         request.studentId,
@@ -285,7 +298,7 @@ export class ClearanceRequestsService {
     return updated;
   }
 
-  async checkAndCompleteStudentClearance(studentId: string) {
+  async checkAndCompleteStudentClearance(studentId: string, academicSessionId: string) {
     // Check if the student has APPROVED requests for ALL active departments and ALL active faculties
     const activeDepartmentsCount = await this.prisma.department.count({
       where: { isActive: true },
@@ -302,6 +315,7 @@ export class ClearanceRequestsService {
     const approvedRequestsCount = await this.prisma.clearanceRequest.count({
       where: {
         studentId,
+        academicSessionId,
         status: ClearanceStatus.APPROVED,
         OR: [
           { department: { isActive: true } },
@@ -313,12 +327,12 @@ export class ClearanceRequestsService {
     if ((activeDepartmentsCount + activeFacultiesCount) > 0 && approvedRequestsCount === (activeDepartmentsCount + activeFacultiesCount)) {
       // Mark all of the student's requests as COMPLETED
       await this.prisma.clearanceRequest.updateMany({
-        where: { studentId },
+        where: { studentId, academicSessionId },
         data: { status: ClearanceStatus.COMPLETED },
       });
 
       // Generate the Certificate
-      await this.certificatesService.generateCertificate(studentId);
+      await this.certificatesService.generateCertificate(studentId, academicSessionId);
 
       // Send final completion notification
       await this.notificationsService.createNotification(

@@ -14,6 +14,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { FacultiesModule } from './faculties/faculties.module';
 import { ProgramsModule } from './programs/programs.module';
+import { AcademicSessionsModule } from './academic-sessions/academic-sessions.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -34,6 +35,7 @@ import configuration from './config/configuration';
     CertificatesModule,
     FacultiesModule,
     ProgramsModule,
+    AcademicSessionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
