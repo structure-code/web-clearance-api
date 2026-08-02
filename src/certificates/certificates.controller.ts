@@ -1,5 +1,5 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiCookieAuth, ApiParam } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiCookieAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CertificatesService } from './certificates.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -13,9 +13,11 @@ export class CertificatesController {
   @Get('mine')
   @UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
-  @ApiOperation({ summary: 'Get current user certificate' })
-  getMyCertificate(@CurrentUser() user: User) {
-    return this.certificatesService.getMyCertificate(user.id);
+  @ApiOperation({ summary: 'Get current user certificate for an academic session' })
+  @ApiQuery({ name: 'academicSessionId', required: true })
+  getMyCertificate(@CurrentUser() user: User, @Query('academicSessionId') academicSessionId?: string) {
+    if (!academicSessionId) throw new BadRequestException('academicSessionId is required');
+    return this.certificatesService.getMyCertificate(user.id, academicSessionId);
   }
 
   @Get('verify/:token')
