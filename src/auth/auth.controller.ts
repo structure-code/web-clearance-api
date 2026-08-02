@@ -1,8 +1,34 @@
-import { Controller, Post, Body, Res, Req, HttpCode, HttpStatus, Get, Query, UseGuards, Patch } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiCookieAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  Req,
+  HttpCode,
+  HttpStatus,
+  Get,
+  Query,
+  UseGuards,
+  Patch,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiCookieAuth,
+} from '@nestjs/swagger';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
-import { AdminLoginDto, StudentLoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto, UpdateProfileDto, ChangePasswordDto } from './dto/auth.dto';
+import {
+  AdminLoginDto,
+  StudentLoginDto,
+  RegisterDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+  UpdateProfileDto,
+  ChangePasswordDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
@@ -37,8 +63,12 @@ export class AuthController {
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login an admin or staff' })
-  async adminLogin(@Body() adminLoginDto: AdminLoginDto, @Res({ passthrough: true }) response: Response) {
-    const { accessToken, refreshToken, user } = await this.authService.adminLogin(adminLoginDto);
+  async adminLogin(
+    @Body() adminLoginDto: AdminLoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.authService.adminLogin(adminLoginDto);
 
     response.cookie('Authentication', accessToken, {
       httpOnly: true,
@@ -60,8 +90,12 @@ export class AuthController {
   @Post('student/login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login a student using Matric No' })
-  async studentLogin(@Body() studentLoginDto: StudentLoginDto, @Res({ passthrough: true }) response: Response) {
-    const { accessToken, refreshToken, user } = await this.authService.studentLogin(studentLoginDto);
+  async studentLogin(
+    @Body() studentLoginDto: StudentLoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.authService.studentLogin(studentLoginDto);
 
     response.cookie('Authentication', accessToken, {
       httpOnly: true,
@@ -83,9 +117,16 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
-  async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const refreshToken = request.cookies?.['Refresh'];
-    const { accessToken, refreshToken: newRefreshToken, user } = await this.authService.refreshTokens(refreshToken);
+    const {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user,
+    } = await this.authService.refreshTokens(refreshToken);
 
     response.cookie('Authentication', accessToken, {
       httpOnly: true,
@@ -108,8 +149,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout' })
   logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie('Authentication');
-    response.clearCookie('Refresh');
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none' as const,
+      path: '/',
+    };
+
+    response.clearCookie('Authentication', cookieOptions);
+    response.clearCookie('Refresh', cookieOptions);
     return { message: 'Logged out successfully' };
   }
 
@@ -131,7 +179,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Update current user profile' })
-  async updateProfile(@CurrentUser() user: User, @Body() updateProfileDto: UpdateProfileDto) {
+  async updateProfile(
+    @CurrentUser() user: User,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
     return this.authService.updateProfile(user, updateProfileDto);
   }
 
@@ -140,7 +191,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Change password for current user' })
-  async changePassword(@CurrentUser() user: User, @Body() changePasswordDto: ChangePasswordDto) {
+  async changePassword(
+    @CurrentUser() user: User,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
     return this.authService.changePassword(user.id, changePasswordDto);
   }
 }
