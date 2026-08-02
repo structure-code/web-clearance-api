@@ -13,14 +13,14 @@ export class AcademicSessionsService {
   }
 
   async findAll() {
-    return this.prisma.academicSession.findMany({ orderBy: [{ isActive: 'desc' }, { name: 'desc' }] });
+    return this.prisma.academicSession.findMany({ orderBy: [{ isActive: 'desc' }, { name: 'desc' }, { semester: 'asc' }] });
   }
 
   async findAllActive() {
     return this.prisma.academicSession.findMany({
       where: { isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: 'desc' },
+      select: { id: true, name: true, semester: true },
+      orderBy: [{ name: 'desc' }, { semester: 'asc' }],
     });
   }
 
