@@ -13,6 +13,7 @@ import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { FacultiesModule } from './faculties/faculties.module';
+import { ProgramsModule } from './programs/programs.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -32,6 +33,7 @@ import configuration from './config/configuration';
     NotificationsModule,
     CertificatesModule,
     FacultiesModule,
+    ProgramsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

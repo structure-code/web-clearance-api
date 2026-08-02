@@ -40,10 +40,10 @@ export class RegisterDto {
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ example: 'uuid-department-id' })
+  @ApiProperty({ example: 'uuid-program-id' })
   @IsString()
   @IsNotEmpty()
-  departmentId!: string;
+  programId!: string;
 }
 
 export class ForgotPasswordDto {
@@ -81,6 +81,11 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   departmentId?: string;
+
+  @ApiProperty({ example: 'uuid-program-id', required: false })
+  @IsOptional()
+  @IsString()
+  programId?: string;
 
   @ApiProperty({ example: 'https://bucket.s3.region.amazonaws.com/signature.png', required: false, description: 'URL of the officer signature image, obtained via POST /files/upload' })
   @IsOptional()

@@ -27,12 +27,6 @@ export class DepartmentsService {
             isActive: true,
           },
         },
-        faculty: {
-          select: {
-            id: true,
-            name: true,
-          }
-        }
       },
     });
   }
@@ -46,12 +40,6 @@ export class DepartmentsService {
         code: true,
         requiresDocument: true,
         requiredDocumentDescription: true,
-        faculty: {
-          select: {
-            id: true,
-            name: true,
-          }
-        }
       },
       orderBy: { name: 'asc' },
     });
@@ -70,7 +58,6 @@ export class DepartmentsService {
             isActive: true,
           },
         },
-        faculty: true,
       },
     });
 

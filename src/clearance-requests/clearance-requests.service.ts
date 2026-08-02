@@ -19,16 +19,20 @@ export class ClearanceRequestsService {
   ) {}
 
   async createBulk(user: User, createDto: CreateBulkClearanceRequestDto) {
-    // Fetch all active departments and faculties
+    if (!user.programId || !user.facultyId) {
+      throw new BadRequestException('You must be associated with a program correctly linked to a faculty to submit a clearance request.');
+    }
+
+    // Fetch all active departments and the student's faculty
     const activeDepartments = await this.prisma.department.findMany({
       where: { isActive: true },
     });
     
-    const activeFaculties = await this.prisma.faculty.findMany({
-      where: { isActive: true },
+    const studentFaculty = await this.prisma.faculty.findUnique({
+      where: { id: user.facultyId },
     });
 
-    if (activeDepartments.length === 0 && activeFaculties.length === 0) {
+    if (activeDepartments.length === 0 && (!studentFaculty || !studentFaculty.isActive)) {
       throw new ConflictException('There are no active departments or faculties for clearance at this time.');
     }
 
@@ -61,12 +65,10 @@ export class ClearanceRequestsService {
         }
       }
     }
-    for (const fac of activeFaculties) {
-      if (fac.requiresDocument) {
-        const providedDocs = submissionsMap.get(`fac_${fac.id}`);
-        if (!providedDocs || providedDocs.length === 0) {
-          throw new BadRequestException(`Faculty ${fac.name} requires a document submission: ${fac.requiredDocumentDescription || 'No description provided.'}`);
-        }
+    if (studentFaculty && studentFaculty.isActive && studentFaculty.requiresDocument) {
+      const providedDocs = submissionsMap.get(`fac_${studentFaculty.id}`);
+      if (!providedDocs || providedDocs.length === 0) {
+        throw new BadRequestException(`Faculty ${studentFaculty.name} requires a document submission: ${studentFaculty.requiredDocumentDescription || 'No description provided.'}`);
       }
     }
 
@@ -92,13 +94,13 @@ export class ClearanceRequestsService {
         requests.push(request);
       }
 
-      for (const fac of activeFaculties) {
-        const documents = submissionsMap.get(`fac_${fac.id}`) || [];
+      if (studentFaculty && studentFaculty.isActive) {
+        const documents = submissionsMap.get(`fac_${studentFaculty.id}`) || [];
         
         const request = await prisma.clearanceRequest.create({
           data: {
             studentId: user.id,
-            facultyId: fac.id,
+            facultyId: studentFaculty.id,
             documents: {
               create: documents,
             },
@@ -288,9 +290,14 @@ export class ClearanceRequestsService {
     const activeDepartmentsCount = await this.prisma.department.count({
       where: { isActive: true },
     });
-    const activeFacultiesCount = await this.prisma.faculty.count({
-      where: { isActive: true },
+    const user = await this.prisma.user.findUnique({ where: { id: studentId } });
+    if (!user || !user.facultyId) return;
+
+    const studentFaculty = await this.prisma.faculty.findUnique({
+      where: { id: user.facultyId },
     });
+
+    const activeFacultiesCount = (studentFaculty && studentFaculty.isActive) ? 1 : 0;
 
     const approvedRequestsCount = await this.prisma.clearanceRequest.count({
       where: {

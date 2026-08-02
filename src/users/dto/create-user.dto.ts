@@ -22,10 +22,16 @@ export class CreateUserDto {
   role!: Role;
 
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false })
-  @ValidateIf(o => o.role === Role.STUDENT)
+  @ValidateIf(o => o.role === Role.DEPARTMENT_OFFICER)
   @IsNotEmpty()
   @IsString()
   departmentId?: string;
+
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false })
+  @ValidateIf(o => o.role === Role.STUDENT)
+  @IsNotEmpty()
+  @IsString()
+  programId?: string;
 
   @ApiProperty({ example: 'uuid-faculty-id', required: false })
   @IsString()
