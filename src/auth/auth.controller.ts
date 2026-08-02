@@ -132,7 +132,7 @@ export class AuthController {
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Update current user profile' })
   async updateProfile(@CurrentUser() user: User, @Body() updateProfileDto: UpdateProfileDto) {
-    return this.authService.updateProfile(user.id, updateProfileDto);
+    return this.authService.updateProfile(user, updateProfileDto);
   }
 
   @Post('me/change-password')

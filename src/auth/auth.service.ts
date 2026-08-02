@@ -44,10 +44,10 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
     let facultyId: string | undefined = undefined;
-    if (registerDto.departmentId) {
-      const dept = await this.usersService['prisma'].department.findUnique({ where: { id: registerDto.departmentId } });
-      if (!dept) throw new BadRequestException('Department not found');
-      facultyId = dept.facultyId || undefined;
+    if (registerDto.programId) {
+      const prog = await this.usersService['prisma'].program.findUnique({ where: { id: registerDto.programId } });
+      if (!prog) throw new BadRequestException('Program not found');
+      facultyId = prog.facultyId || undefined;
     }
 
     const user = await this.usersService.create({
@@ -56,7 +56,7 @@ export class AuthService {
       name: registerDto.name,
       role: Role.STUDENT,
       isEmailVerified: true, // No email verification required for students
-      department: { connect: { id: registerDto.departmentId } },
+      program: { connect: { id: registerDto.programId } },
       ...(facultyId ? { faculty: { connect: { id: facultyId } } } : {})
     });
 
@@ -183,8 +183,11 @@ export class AuthService {
     return { message: 'Password has been successfully reset' };
   }
 
-  async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
-    return this.usersService.update(userId, updateProfileDto);
+  async updateProfile(user: User, updateProfileDto: UpdateProfileDto) {
+    if (updateProfileDto.signatureUrl && user.role !== Role.DEPARTMENT_OFFICER && user.role !== Role.FACULTY_OFFICER) {
+      throw new BadRequestException('Only department and faculty officers can upload a signature.');
+    }
+    return this.usersService.update(user.id, updateProfileDto);
   }
 
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {

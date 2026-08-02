@@ -58,7 +58,7 @@ export class FacultiesService {
             isActive: true,
           },
         },
-        departments: {
+        programs: {
           select: {
             id: true,
             name: true,
@@ -86,7 +86,7 @@ export class FacultiesService {
     const faculty = await this.prisma.faculty.findUnique({
       where: { id },
       include: { 
-        _count: { select: { users: true, departments: true } } 
+        _count: { select: { users: true, programs: true } } 
       },
     });
 
@@ -98,8 +98,8 @@ export class FacultiesService {
       throw new BadRequestException('Cannot delete faculty because users are assigned to it. Deactivate or remove users first.');
     }
 
-    if (faculty._count.departments > 0) {
-      throw new BadRequestException('Cannot delete faculty because departments are assigned to it.');
+    if (faculty._count.programs > 0) {
+      throw new BadRequestException('Cannot delete faculty because programs are assigned to it.');
     }
 
     return this.prisma.faculty.delete({

@@ -14,62 +14,77 @@ enum Role {
 }
 
 model Faculty {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  code      String   @unique
-  isActive  Boolean  @default(true)
-  requiresDocument Boolean @default(false)
+  id                          String  @id @default(uuid())
+  name                        String  @unique
+  code                        String  @unique
+  isActive                    Boolean @default(true)
+  requiresDocument            Boolean @default(false)
   requiredDocumentDescription String?
-  
-  departments Department[]
-  users     User[]
+
+  programs          Program[]
+  users             User[]
   clearanceRequests ClearanceRequest[]
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Department {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  code      String   @unique
-  isActive  Boolean  @default(true)
-  requiresDocument Boolean @default(false)
+  id                          String  @id @default(uuid())
+  name                        String  @unique
+  code                        String  @unique
+  isActive                    Boolean @default(true)
+  requiresDocument            Boolean @default(false)
   requiredDocumentDescription String?
-  
+
+  users             User[]
+  clearanceRequests ClearanceRequest[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Program {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  code     String  @unique
+  isActive Boolean @default(true)
+
   facultyId String
   faculty   Faculty @relation(fields: [facultyId], references: [id])
 
-  users     User[]
-  clearanceRequests ClearanceRequest[]
+  users User[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model User {
-  id               String      @id @default(uuid())
-  email            String?     @unique
-  matricNo         String?     @unique
-  password         String
-  name             String?
-  role             Role        @default(STUDENT)
-  
-  isEmailVerified  Boolean     @default(false)
-  emailVerifyToken String?     @unique
-  isActive         Boolean     @default(true)
+  id       String  @id @default(uuid())
+  email    String? @unique
+  matricNo String? @unique
+  password String
+  name     String?
+  role     Role    @default(STUDENT)
+
+  isEmailVerified  Boolean @default(false)
+  emailVerifyToken String? @unique
+  isActive         Boolean @default(true)
   signatureUrl     String?
-  
-  departmentId     String?
-  department       Department? @relation(fields: [departmentId], references: [id])
-  
-  facultyId        String?
-  faculty          Faculty?    @relation(fields: [facultyId], references: [id])
-  
-  resetToken       String?     @unique
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  programId String?
+  program   Program? @relation(fields: [programId], references: [id])
+
+  facultyId String?
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
+
+  resetToken       String?   @unique
   resetTokenExpiry DateTime?
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   clearanceRequests ClearanceRequest[] @relation("StudentClearance")
   activityLogs      ActivityLog[]
   notifications     Notification[]
@@ -85,55 +100,55 @@ enum ClearanceStatus {
 }
 
 model ClearanceRequest {
-  id           String          @id @default(uuid())
-  studentId    String
-  student      User            @relation("StudentClearance", fields: [studentId], references: [id])
-  
+  id        String @id @default(uuid())
+  studentId String
+  student   User   @relation("StudentClearance", fields: [studentId], references: [id])
+
   departmentId String?
-  department   Department?      @relation(fields: [departmentId], references: [id])
-  
-  facultyId    String?
-  faculty      Faculty?         @relation(fields: [facultyId], references: [id])
-  
-  status       ClearanceStatus @default(PENDING)
-  remarks      String?         @db.Text
-  
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  facultyId String?
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
+
+  status  ClearanceStatus @default(PENDING)
+  remarks String?         @db.Text
+
   clearedByOfficerName  String?
   clearedBySignatureUrl String?
   clearedAt             DateTime?
-  
-  documents    Document[]
-  
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Document {
   id                 String           @id @default(uuid())
   clearanceRequestId String
   clearanceRequest   ClearanceRequest @relation(fields: [clearanceRequestId], references: [id], onDelete: Cascade)
-  
-  fileName           String
-  fileUrl            String
-  fileType           String
-  fileSize           Int
-  
-  uploadedAt         DateTime         @default(now())
+
+  fileName String
+  fileUrl  String
+  fileType String
+  fileSize Int
+
+  uploadedAt DateTime @default(now())
 }
 
 model ActivityLog {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  
-  action      String
-  entityId    String?
-  entityType  String?
-  
-  ipAddress   String?
-  userAgent   String?
-  
-  createdAt   DateTime @default(now())
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  action     String
+  entityId   String?
+  entityType String?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
 }
 
 enum NotificationType {
@@ -144,25 +159,25 @@ enum NotificationType {
 }
 
 model Notification {
-  id        String           @id @default(uuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id])
-  
-  title     String
-  message   String           @db.Text
-  type      NotificationType @default(INFO)
-  isRead    Boolean          @default(false)
-  
-  createdAt DateTime         @default(now())
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  title   String
+  message String           @db.Text
+  type    NotificationType @default(INFO)
+  isRead  Boolean          @default(false)
+
+  createdAt DateTime @default(now())
 }
 
 model Certificate {
-  id                String   @id @default(uuid())
-  studentId         String   @unique
-  student           User     @relation(fields: [studentId], references: [id])
-  
-  verificationToken String   @unique
+  id        String @id @default(uuid())
+  studentId String @unique
+  student   User   @relation(fields: [studentId], references: [id])
+
+  verificationToken String @unique
   fileUrl           String
-  
-  issuedAt          DateTime @default(now())
+
+  issuedAt DateTime @default(now())
 }

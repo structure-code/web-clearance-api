@@ -18,10 +18,10 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     
     let facultyId = createUserDto.facultyId;
-    if (createUserDto.departmentId && !facultyId) {
-      const dept = await this.prisma.department.findUnique({ where: { id: createUserDto.departmentId } });
-      if (!dept) throw new BadRequestException('Department not found');
-      facultyId = dept.facultyId || undefined;
+    if (createUserDto.programId && !facultyId) {
+      const prog = await this.prisma.program.findUnique({ where: { id: createUserDto.programId } });
+      if (!prog) throw new BadRequestException('Program not found');
+      facultyId = prog.facultyId || undefined;
     }
 
     return this.prisma.user.create({
@@ -44,6 +44,7 @@ export class UsersService {
         isActive: true,
         isEmailVerified: true,
         departmentId: true,
+        programId: true,
         facultyId: true,
         createdAt: true,
         updatedAt: true,
